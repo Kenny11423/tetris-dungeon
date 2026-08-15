@@ -7,17 +7,22 @@ app.use(express.json());
 // Configure Database connection
 const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
+    port: process.env.DB_PORT || 3306,
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '123456',
-    database: process.env.DB_NAME || 'tetris_dungeon'
+    database: process.env.DB_NAME || 'tetris_dungeon',
+    ssl: { rejectUnauthorized: false } // Required for cloud databases like Aiven
 };
 
 async function initDB() {
-    const conn = await mysql.createConnection({ ...dbConfig, database: undefined });
-    await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbConfig.database}\``);
-    await conn.end();
-    
+    // Cloud DBs usually pre-create a database (e.g., 'defaultdb') and restrict CREATE DATABASE privileges.
+    // So we connect directly to the provided database.
     const pool = mysql.createPool(dbConfig);
+    
+    // Test the connection
+    await pool.query('SELECT 1');
+    
+    // Create table if it doesn't exist
     await pool.query(`
         CREATE TABLE IF NOT EXISTS highscores (
             id INT AUTO_INCREMENT PRIMARY KEY,
@@ -31,7 +36,14 @@ async function initDB() {
 }
 
 let pool;
-initDB().then(p => { pool = p; console.log("Database connected!"); }).catch(console.error);
+initDB().then(p => { 
+    pool = p; 
+    console.log("Database connected successfully!"); 
+}).catch(err => {
+    console.error("Database connection failed:");
+    console.error(err.message);
+    console.error(err);
+});
 
 // GET Top Scores (Returns CSV format for easy Java parsing without Gson)
 app.get('/api/scores', async (req, res) => {
