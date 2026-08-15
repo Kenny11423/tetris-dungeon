@@ -285,6 +285,7 @@ public class Board extends JPanel {
             curPiece.setShape(Tetrominoe.NoShape);
             if (timer != null) timer.stop();
             isStarted = false;
+            parent.handleGameOver();
         }
     }
 

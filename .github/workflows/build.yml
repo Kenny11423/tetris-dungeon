@@ -25,10 +25,15 @@ jobs:
     - name: Compile Java source code
       run: |
         mkdir -p bin
+        mkdir -p lib
+        curl -L -o lib/mariadb-java-client.jar https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.1.4/mariadb-java-client-3.1.4.jar
         javac -d bin src/com/tetris/*.java
         
     - name: Package to JAR
       run: |
+        cd bin
+        jar xf ../lib/mariadb-java-client.jar
+        cd ..
         jar cfe TetrisDungeon.jar com.tetris.Tetris -C bin .
         
     - name: Upload JAR Artifact
@@ -55,11 +60,16 @@ jobs:
       shell: bash
       run: |
         mkdir -p bin
+        mkdir -p lib
+        curl -L -o lib/mariadb-java-client.jar https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.1.4/mariadb-java-client-3.1.4.jar
         javac -d bin src/com/tetris/*.java
         
     - name: Package to JAR
       shell: bash
       run: |
+        cd bin
+        jar xf ../lib/mariadb-java-client.jar
+        cd ..
         jar cfe TetrisDungeon.jar com.tetris.Tetris -C bin .
         
     - name: Build EXE using jpackage

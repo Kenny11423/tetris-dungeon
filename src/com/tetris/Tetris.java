@@ -97,6 +97,7 @@ public class Tetris extends JFrame {
         cards.add(createHomePanel(), "Home");
         cards.add(createGamePanel(), "Game");
         cards.add(createEventPanel(), "Event");
+        cards.add(createLeaderboardPanel(), "Leaderboard");
 
         add(cards);
 
@@ -123,6 +124,13 @@ public class Tetris extends JFrame {
             board.requestFocusInWindow();
         });
 
+        JButton btnLeaderboard = createStyledButton("Leaderboard");
+        btnLeaderboard.setPreferredSize(new Dimension(200, 40));
+        btnLeaderboard.addActionListener(e -> {
+            updateLeaderboardPanel();
+            cardLayout.show(cards, "Leaderboard");
+        });
+
         JButton btnQuit = createStyledButton("Quit");
         btnQuit.setPreferredSize(new Dimension(200, 40));
         btnQuit.addActionListener(e -> System.exit(0));
@@ -138,10 +146,72 @@ public class Tetris extends JFrame {
         panel.add(btnPlay, gbc);
 
         gbc.gridy = 2;
+        panel.add(btnLeaderboard, gbc);
+        
+        gbc.gridy = 3;
         gbc.insets = new Insets(0, 0, 0, 0);
         panel.add(btnQuit, gbc);
 
         return panel;
+    }
+
+    private JPanel leaderboardContent;
+
+    private JPanel createLeaderboardPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(new Color(25, 25, 25));
+
+        JLabel title = new JLabel("High Scores", SwingConstants.CENTER);
+        title.setForeground(new Color(91, 192, 222));
+        title.setFont(new Font("SansSerif", Font.BOLD, 32));
+        title.setBorder(BorderFactory.createEmptyBorder(20, 0, 20, 0));
+        panel.add(title, BorderLayout.NORTH);
+
+        leaderboardContent = new JPanel();
+        leaderboardContent.setLayout(new BoxLayout(leaderboardContent, BoxLayout.Y_AXIS));
+        leaderboardContent.setBackground(new Color(25, 25, 25));
+        panel.add(leaderboardContent, BorderLayout.CENTER);
+
+        JButton btnBack = createStyledButton("Back to Menu");
+        btnBack.addActionListener(e -> cardLayout.show(cards, "Home"));
+        JPanel bottom = new JPanel();
+        bottom.setBackground(new Color(25, 25, 25));
+        bottom.add(btnBack);
+        panel.add(bottom, BorderLayout.SOUTH);
+
+        return panel;
+    }
+
+    private void updateLeaderboardPanel() {
+        leaderboardContent.removeAll();
+        java.util.List<DatabaseManager.HighScore> scores = DatabaseManager.getTopScores(10);
+        
+        for (int i = 0; i < scores.size(); i++) {
+            DatabaseManager.HighScore s = scores.get(i);
+            JLabel lbl = new JLabel((i + 1) + ". " + s.name + " - Score: " + s.score + " (Level " + s.level + ")");
+            lbl.setForeground(Color.WHITE);
+            lbl.setFont(new Font("SansSerif", Font.PLAIN, 18));
+            lbl.setAlignmentX(CENTER_ALIGNMENT);
+            leaderboardContent.add(lbl);
+            leaderboardContent.add(Box.createRigidArea(new Dimension(0, 10)));
+        }
+        leaderboardContent.revalidate();
+        leaderboardContent.repaint();
+    }
+
+    public void handleGameOver() {
+        if (bossTimer != null) bossTimer.stop();
+        if (bossSkillTimer != null) bossSkillTimer.stop();
+        
+        int s = Integer.parseInt(scoreValueLabel.getText().replace(",", ""));
+        if (s > 0) {
+            String name = javax.swing.JOptionPane.showInputDialog(this, "Game Over! Enter your name:", "High Score", javax.swing.JOptionPane.PLAIN_MESSAGE);
+            if (name != null && !name.trim().isEmpty()) {
+                DatabaseManager.saveHighScore(name.trim(), s, level);
+            }
+        }
+        updateLeaderboardPanel();
+        cardLayout.show(cards, "Leaderboard");
     }
 
     private JPanel createEventPanel() {
@@ -559,6 +629,7 @@ public class Tetris extends JFrame {
     }
 
     public static void main(String[] args) {
+        DatabaseManager.initializeDatabase();
         EventQueue.invokeLater(() -> {
             var game = new Tetris();
             game.setVisible(true);
