@@ -16,7 +16,7 @@ public class Board extends JPanel {
     private final int BOARD_WIDTH = 10;
     private final int BOARD_HEIGHT = 22;
     private final int INITIAL_DELAY = 100;
-    private int periodInterval = 600;
+    private int periodInterval = 1000;
 
     private Timer timer;
     private boolean isFallingFinished = false;
@@ -30,6 +30,13 @@ public class Board extends JPanel {
     private Shape curPiece;
     private Tetrominoe[] board;
 
+    // Debuff flags
+    private boolean hideGhostPiece = false;
+    private boolean inverseControls = false;
+    private int noRotateCount = 0;
+    private boolean speedDebuffActive = false;
+    private int normalPeriodInterval = 600;
+
     public Board(Tetris parent) {
         this.parent = parent;
         initBoard();
@@ -38,6 +45,16 @@ public class Board extends JPanel {
     private void initBoard() {
         setFocusable(true);
         addKeyListener(new TAdapter());
+    }
+
+    public void setHideGhostPiece(boolean hide) { this.hideGhostPiece = hide; repaint(); }
+    public void setInverseControls(boolean inverse) { this.inverseControls = inverse; }
+    public void setNoRotateCount(int count) { this.noRotateCount = count; }
+    public void setSpeedDebuffActive(boolean active) { 
+        this.speedDebuffActive = active; 
+        if (timer != null) {
+            timer.setDelay(active ? normalPeriodInterval / 3 : normalPeriodInterval);
+        }
     }
 
     private int squareSize() {
@@ -79,9 +96,13 @@ public class Board extends JPanel {
     }
 
     public void updateSpeed(int level) {
-        periodInterval = Math.max(150, 600 - ((level - 1) * 40));
-        if (timer != null) {
+        int bossTier = (level - 1) / 5;
+        normalPeriodInterval = Math.max(150, 1000 - (bossTier * 100));
+        periodInterval = normalPeriodInterval;
+        if (timer != null && !speedDebuffActive) {
             timer.setDelay(periodInterval);
+        } else if (timer != null && speedDebuffActive) {
+            timer.setDelay(normalPeriodInterval / 3);
         }
     }
 
@@ -166,15 +187,17 @@ public class Board extends JPanel {
         }
 
         if (curPiece != null && curPiece.getShape() != Tetrominoe.NoShape) {
-            int ghostY = curY;
-            while (ghostY > 0 && canMove(curPiece, curX, ghostY - 1)) {
-                ghostY--;
-            }
-            
-            for (int i = 0; i < 4; i++) {
-                int x = curX + curPiece.x(i);
-                int y = ghostY - curPiece.y(i);
-                drawGhostSquare(g, boardLeft + x * sqSize, boardTop + (BOARD_HEIGHT - y - 1) * sqSize, curPiece.getShape(), sqSize);
+            if (!hideGhostPiece) {
+                int ghostY = curY;
+                while (ghostY > 0 && canMove(curPiece, curX, ghostY - 1)) {
+                    ghostY--;
+                }
+                
+                for (int i = 0; i < 4; i++) {
+                    int x = curX + curPiece.x(i);
+                    int y = ghostY - curPiece.y(i);
+                    drawGhostSquare(g, boardLeft + x * sqSize, boardTop + (BOARD_HEIGHT - y - 1) * sqSize, curPiece.getShape(), sqSize);
+                }
             }
             
             for (int i = 0; i < 4; i++) {
@@ -210,9 +233,18 @@ public class Board extends JPanel {
         pieceDropped();
     }
 
+    private int lockGraceTicks = 0;
+
     private void oneLineDown() {
-        if (!tryMove(curPiece, curX, curY - 1)) {
-            pieceDropped();
+        if (!canMove(curPiece, curX, curY - 1)) {
+            lockGraceTicks++;
+            if (lockGraceTicks >= 2) { // Wait 1 extra tick before locking
+                pieceDropped();
+                lockGraceTicks = 0;
+            }
+        } else {
+            tryMove(curPiece, curX, curY - 1);
+            lockGraceTicks = 0;
         }
     }
 
@@ -230,6 +262,11 @@ public class Board extends JPanel {
         }
 
         removeFullLines();
+        
+        if (noRotateCount > 0) {
+            noRotateCount--;
+            parent.updateDebuffStatus(noRotateCount > 0 ? "No Rotate (" + noRotateCount + ")" : "");
+        }
 
         if (!isFallingFinished) {
             newPiece();
@@ -275,6 +312,9 @@ public class Board extends JPanel {
         curPiece = newPiece;
         curX = newX;
         curY = newY;
+        
+        lockGraceTicks = 0; // Reset grace period on successful move/rotate
+        
         repaint();
 
         return true;
@@ -413,16 +453,20 @@ public class Board extends JPanel {
 
             switch (keycode) {
                 case KeyEvent.VK_LEFT:
-                    tryMove(curPiece, curX - 1, curY);
+                    if (inverseControls) tryMove(curPiece, curX + 1, curY);
+                    else tryMove(curPiece, curX - 1, curY);
                     break;
                 case KeyEvent.VK_RIGHT:
-                    tryMove(curPiece, curX + 1, curY);
+                    if (inverseControls) tryMove(curPiece, curX - 1, curY);
+                    else tryMove(curPiece, curX + 1, curY);
                     break;
                 case KeyEvent.VK_DOWN:
                     oneLineDown();
                     break;
                 case KeyEvent.VK_UP:
-                    tryMove(curPiece.rotateRight(), curX, curY);
+                    if (noRotateCount <= 0) {
+                        tryMove(curPiece.rotateRight(), curX, curY);
+                    }
                     break;
                 case KeyEvent.VK_SPACE:
                     dropDown();

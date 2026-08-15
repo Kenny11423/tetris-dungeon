@@ -36,6 +36,11 @@ public class Tetris extends JFrame {
     private int attackTimer = 0;
     private int maxAttackTimer;
     private Timer bossTimer;
+    private Timer bossSkillTimer;
+    private JLabel skillStatusLabel;
+    private int bossSkillInterval = 5000;
+    private int bonusGarbageLines = 0;
+    private boolean hideNextPiece = false;
 
     private JPanel bossHpBar;
     private JPanel attackTimerBar;
@@ -50,6 +55,12 @@ public class Tetris extends JFrame {
 
     private Shape currentNextPiece;
     private JPanel nextBlockPreview;
+
+    public void updateDebuffStatus(String text) {
+        if (skillStatusLabel != null) {
+            skillStatusLabel.setText(text);
+        }
+    }
 
     public void updateNextPiece(Shape nextPiece) {
         this.currentNextPiece = nextPiece;
@@ -186,7 +197,7 @@ public class Tetris extends JFrame {
         topPanel.setBackground(new Color(30, 30, 30));
         topPanel.setPreferredSize(new Dimension(800, 80));
         
-        JLabel playerFx = new JLabel("<html><div style='text-align: center;'><span style='font-size: 20px; color: #5bc0de;'>👻</span><br><span style='color: #888888; font-family: sans-serif;'>Player</span></div></html>");
+        JLabel playerFx = new JLabel("<html><div style='text-align: center;'><span style='color: #5bc0de; font-family: sans-serif; font-weight: bold;'>[ YOU ]</span><br><span style='color: #888888; font-family: sans-serif;'>Player</span></div></html>");
         playerFx.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
         
         JLabel arrow = new JLabel("→");
@@ -227,7 +238,7 @@ public class Tetris extends JFrame {
             @Override
             protected void paintComponent(Graphics g) {
                 super.paintComponent(g);
-                if (currentNextPiece != null && currentNextPiece.getShape() != Shape.Tetrominoe.NoShape) {
+                if (currentNextPiece != null && currentNextPiece.getShape() != Shape.Tetrominoe.NoShape && !hideNextPiece) {
                     int sqSize = 18;
                     int offsetX = getWidth() / 2 - sqSize / 2;
                     int offsetY = getHeight() / 2 - sqSize / 2;
@@ -355,6 +366,13 @@ public class Tetris extends JFrame {
         rightPanel.add(Box.createRigidArea(new Dimension(0, 5)));
         rightPanel.add(attackTimerBar);
 
+        skillStatusLabel = new JLabel("");
+        skillStatusLabel.setForeground(new Color(217, 83, 79));
+        skillStatusLabel.setFont(new Font("SansSerif", Font.BOLD, 14));
+        skillStatusLabel.setAlignmentX(LEFT_ALIGNMENT);
+        rightPanel.add(Box.createRigidArea(new Dimension(0, 20)));
+        rightPanel.add(skillStatusLabel);
+
         gbc.gridx = 2;
         gbc.weightx = 0.3;
         centerContainer.add(rightPanel, gbc);
@@ -388,17 +406,18 @@ public class Tetris extends JFrame {
         
         if (isBoss) {
             levelLabel.setText("Stage: " + level + " (BOSS)");
-            bossAnimLabel.setText("<html><div style='text-align: center;'><span style='font-size: 24px; color: #d9534f;'>👺</span><br><span style='color: #d9534f; font-family: sans-serif;'>BOSS</span></div></html>");
+            bossAnimLabel.setText("<html><div style='text-align: center;'><span style='font-size: 20px; font-weight: bold; color: #d9534f;'>[ ENEMY ]</span><br><span style='color: #d9534f; font-family: sans-serif;'>BOSS</span></div></html>");
             maxEnemyHp = 100 + (level * 20); // Boss has more HP
         } else {
             levelLabel.setText("Stage: " + level);
-            bossAnimLabel.setText("<html><div style='text-align: center;'><span style='font-size: 20px; color: #f0ad4e;'>👾</span><br><span style='color: #888888; font-family: sans-serif;'>Monster</span></div></html>");
+            bossAnimLabel.setText("<html><div style='text-align: center;'><span style='font-size: 16px; font-weight: bold; color: #f0ad4e;'>[ ENEMY ]</span><br><span style='color: #888888; font-family: sans-serif;'>Monster</span></div></html>");
             maxEnemyHp = 30 + (level * 10); // Monsters have less HP
         }
         
         enemyHp = maxEnemyHp;
         attackTimer = 0;
-        maxAttackTimer = Math.max(50, 150 - (level * 5)); 
+        int bossTier = (level - 1) / 5;
+        maxAttackTimer = Math.max(50, 150 - (bossTier * 20)); 
         
         bossHpBar.repaint();
         attackTimerBar.repaint();
@@ -407,9 +426,10 @@ public class Tetris extends JFrame {
             board.updateSpeed(level);
         }
 
-        if (bossTimer != null) {
-            bossTimer.stop();
-        }
+        if (bossTimer != null) bossTimer.stop();
+        if (bossSkillTimer != null) bossSkillTimer.stop();
+        
+        clearAllDebuffs();
         
         bossTimer = new Timer(100, e -> {
             if (!board.isPaused() && board.isStarted() && !board.isEventPaused()) {
@@ -417,11 +437,79 @@ public class Tetris extends JFrame {
                 if (attackTimer >= maxAttackTimer) {
                     attackTimer = 0;
                     board.addGarbageLine();
+                    for (int i = 0; i < bonusGarbageLines; i++) {
+                        board.addGarbageLine();
+                    }
+                    bonusGarbageLines = 0; // reset after cast
                 }
                 attackTimerBar.repaint();
             }
         });
         bossTimer.start();
+        
+        if (isBoss) {
+            bossSkillInterval = Math.max(2000, 10000 - (bossTier * 1000));
+            bossSkillTimer = new Timer(bossSkillInterval, e -> {
+                if (!board.isPaused() && board.isStarted() && !board.isEventPaused()) {
+                    castBossSkill(bossTier);
+                }
+            });
+            bossSkillTimer.start();
+        }
+    }
+
+    private void clearAllDebuffs() {
+        hideNextPiece = false;
+        bonusGarbageLines = 0;
+        updateDebuffStatus("");
+        if (nextBlockPreview != null) nextBlockPreview.repaint();
+        if (board != null) {
+            board.setHideGhostPiece(false);
+            board.setInverseControls(false);
+            board.setNoRotateCount(0);
+            board.setSpeedDebuffActive(false);
+        }
+    }
+
+    private void castBossSkill(int bossTier) {
+        clearAllDebuffs();
+        int skillOptions = Math.min(2 + bossTier, 6);
+        int skill = random.nextInt(skillOptions);
+        
+        switch(skill) {
+            case 0:
+                hideNextPiece = true;
+                updateDebuffStatus("Blind (Hide Next)");
+                if (nextBlockPreview != null) nextBlockPreview.repaint();
+                break;
+            case 1:
+                updateDebuffStatus("Haste (Boss Fast Attack)");
+                attackTimer = Math.max(attackTimer, maxAttackTimer - 20);
+                break;
+            case 2:
+                board.setHideGhostPiece(true);
+                updateDebuffStatus("No Shadow");
+                break;
+            case 3:
+                board.setNoRotateCount(3 + bossTier);
+                updateDebuffStatus("No Rotate (" + (3 + bossTier) + ")");
+                break;
+            case 4:
+                updateDebuffStatus("Boss Heal");
+                enemyHp = Math.min(maxEnemyHp, enemyHp + 30);
+                bossHpBar.repaint();
+                break;
+            case 5:
+                updateDebuffStatus("Inverse Controls!");
+                board.setInverseControls(true);
+                break;
+        }
+        
+        Timer debuffResetTimer = new Timer(bossSkillInterval / 2, evt -> {
+            clearAllDebuffs();
+        });
+        debuffResetTimer.setRepeats(false);
+        debuffResetTimer.start();
     }
 
     public void updateScoreAndDamageBoss(int score, int linesCleared) {
