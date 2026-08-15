@@ -52,18 +52,19 @@ jobs:
         distribution: 'temurin'
         
     - name: Compile Java source code
+      shell: bash
       run: |
-        mkdir bin
+        mkdir -p bin
         javac -d bin src/com/tetris/*.java
         
     - name: Package to JAR
+      shell: bash
       run: |
         jar cfe TetrisDungeon.jar com.tetris.Tetris -C bin .
         
     - name: Build EXE using jpackage
+      shell: bash
       run: |
-        # jpackage creates an app image containing the .exe and bundled JRE
-        # --win-dir-chooser and --win-shortcut flags can be added if using --type exe instead of app-image
         jpackage --type app-image --name TetrisDungeon --input . --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris
         
     - name: Zip the Windows package
