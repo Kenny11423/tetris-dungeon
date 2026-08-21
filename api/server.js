@@ -52,6 +52,7 @@ app.get('/api/scores', async (req, res) => {
         const csv = rows.map(r => `${r.name},${r.score},${r.level}`).join('\n');
         res.send(csv);
     } catch (err) {
+        console.error("GET Error:", err);
         res.status(500).send("Error");
     }
 });
@@ -65,6 +66,7 @@ app.post('/api/scores', async (req, res) => {
         console.log(`[+] New score saved: ${name} - ${score} (Level ${level})`);
         res.send("Success");
     } catch (err) {
+        console.error("POST Error:", err);
         res.status(500).send("Error");
     }
 });

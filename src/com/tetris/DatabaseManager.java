@@ -13,7 +13,7 @@ public class DatabaseManager {
 
     // IMPORTANT: Update this URL to point to your online API
     // For local testing, keep it as localhost:3000
-    private static final String API_URL = "http://localhost:3000/api/scores";
+    private static final String API_URL = "https://tetris-dungeon.onrender.com/api/scores";
     
     private static final HttpClient client = HttpClient.newBuilder()
             .version(HttpClient.Version.HTTP_2)
