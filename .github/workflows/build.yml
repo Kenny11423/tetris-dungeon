@@ -27,7 +27,7 @@ jobs:
         mkdir -p bin
         mkdir -p lib
         curl -L -o lib/mariadb-java-client.jar https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.1.4/mariadb-java-client-3.1.4.jar
-        javac -d bin src/com/tetris/*.java
+        javac -encoding UTF-8 -d bin src/com/tetris/*.java
         
     - name: Package to JAR
       run: |
@@ -62,7 +62,7 @@ jobs:
         mkdir -p bin
         mkdir -p lib
         curl -L -o lib/mariadb-java-client.jar https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.1.4/mariadb-java-client-3.1.4.jar
-        javac -d bin src/com/tetris/*.java
+        javac -encoding UTF-8 -d bin src/com/tetris/*.java
         
     - name: Package to JAR
       shell: bash
