@@ -36,6 +36,9 @@ public class Board extends JPanel {
     private int noRotateCount = 0;
     private boolean speedDebuffActive = false;
     private int normalPeriodInterval = 600;
+    
+    private boolean monoBlockActive = false;
+    private Tetrominoe monoBlockType = Tetrominoe.SquareShape;
 
     public Board(Tetris parent) {
         this.parent = parent;
@@ -50,6 +53,16 @@ public class Board extends JPanel {
     public void setHideGhostPiece(boolean hide) { this.hideGhostPiece = hide; repaint(); }
     public void setInverseControls(boolean inverse) { this.inverseControls = inverse; }
     public void setNoRotateCount(int count) { this.noRotateCount = count; }
+    
+    public void setMonoBlock(boolean active, Tetrominoe type) {
+        this.monoBlockActive = active;
+        this.monoBlockType = type;
+        if (active && nextPiece != null) {
+            nextPiece.setShape(type);
+            parent.updateNextPiece(nextPiece);
+        }
+    }
+    
     public void setSpeedDebuffActive(boolean active) { 
         this.speedDebuffActive = active; 
         if (timer != null) {
@@ -71,6 +84,8 @@ public class Board extends JPanel {
     public boolean isEventPaused() { return isEventPaused; }
 
     private Shape nextPiece;
+    private Shape holdPiece;
+    private boolean hasHeld = false;
 
     public Shape getNextPiece() { return nextPiece; }
 
@@ -78,12 +93,17 @@ public class Board extends JPanel {
         curPiece = new Shape();
         nextPiece = new Shape();
         nextPiece.setRandomShape();
+        holdPiece = new Shape();
+        holdPiece.setShape(Tetrominoe.NoShape);
+        parent.updateHoldPiece(holdPiece);
+        
         board = new Tetrominoe[BOARD_WIDTH * BOARD_HEIGHT];
 
         clearBoard();
         isStarted = true;
         isFallingFinished = false;
         isEventPaused = false;
+        hasHeld = false;
         score = 0;
 
         newPiece();
@@ -275,8 +295,15 @@ public class Board extends JPanel {
 
     private void newPiece() {
         curPiece.setShape(nextPiece.getShape());
-        nextPiece.setRandomShape();
+        
+        if (monoBlockActive) {
+            nextPiece.setShape(monoBlockType);
+        } else {
+            nextPiece.setRandomShape();
+        }
         parent.updateNextPiece(nextPiece);
+        
+        hasHeld = false;
         
         curX = BOARD_WIDTH / 2 + 1;
         curY = BOARD_HEIGHT - 1 + curPiece.minY();
@@ -434,6 +461,52 @@ public class Board extends JPanel {
         }
     }
 
+    public void holdPieceAction() {
+        if (!isStarted || isEventPaused || curPiece.getShape() == Tetrominoe.NoShape || hasHeld) {
+            return;
+        }
+
+        if (holdPiece.getShape() == Tetrominoe.NoShape) {
+            holdPiece.setShape(curPiece.getShape());
+            newPiece();
+            hasHeld = true; // wait, newPiece sets it to false, so we must set it to true AFTER newPiece()
+        } else {
+            Shape temp = new Shape();
+            temp.setShape(curPiece.getShape());
+            curPiece.setShape(holdPiece.getShape());
+            holdPiece.setShape(temp.getShape());
+            
+            curX = BOARD_WIDTH / 2 + 1;
+            curY = BOARD_HEIGHT - 1 + curPiece.minY();
+            
+            if (!canMove(curPiece, curX, curY)) {
+                // If it can't spawn, game over
+                curPiece.setShape(Tetrominoe.NoShape);
+                if (timer != null) timer.stop();
+                isStarted = false;
+                parent.handleGameOver();
+                return;
+            }
+        }
+        parent.updateHoldPiece(holdPiece);
+        hasHeld = true;
+        lockGraceTicks = 0;
+        repaint();
+    }
+
+    private void tryRotate(Shape newPiece, int currentX, int currentY) {
+        // Normal rotation
+        if (tryMove(newPiece, currentX, currentY)) return;
+        
+        // Basic Wall Kicking (SRS-lite)
+        // Try shifting left or right by 1 or 2 blocks, or up by 1 block
+        if (tryMove(newPiece, currentX - 1, currentY)) return;
+        if (tryMove(newPiece, currentX + 1, currentY)) return;
+        if (tryMove(newPiece, currentX, currentY - 1)) return;
+        if (tryMove(newPiece, currentX - 2, currentY)) return;
+        if (tryMove(newPiece, currentX + 2, currentY)) return;
+    }
+
     class TAdapter extends KeyAdapter {
         @Override
         public void keyPressed(KeyEvent e) {
@@ -466,7 +539,7 @@ public class Board extends JPanel {
                     break;
                 case KeyEvent.VK_UP:
                     if (noRotateCount <= 0) {
-                        tryMove(curPiece.rotateRight(), curX, curY);
+                        tryRotate(curPiece.rotateRight(), curX, curY);
                     }
                     break;
                 case KeyEvent.VK_SPACE:
@@ -474,6 +547,18 @@ public class Board extends JPanel {
                     break;
                 case KeyEvent.VK_D:
                     oneLineDown();
+                    break;
+                case KeyEvent.VK_C:
+                    holdPieceAction();
+                    break;
+                case KeyEvent.VK_1:
+                    parent.useItem(0);
+                    break;
+                case KeyEvent.VK_2:
+                    parent.useItem(1);
+                    break;
+                case KeyEvent.VK_3:
+                    parent.useItem(2);
                     break;
             }
         }
