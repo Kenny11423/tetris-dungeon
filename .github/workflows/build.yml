@@ -42,19 +42,25 @@ jobs:
         "Main-Class: com.tetris.Tetris" | Out-File -Encoding ascii manifest.txt
         jar cvfm TetrisDungeon.jar manifest.txt -C bin .
 
-    - name: Build Windows Executable (TetrisDungeon.exe) using jpackage
+    - name: Create Single Standalone EXE (Launch4j - No subfolders/cfg needed)
+      uses: fvarrui/launch4j-action@v2
+      with:
+        headerType: 'gui'
+        jar: 'TetrisDungeon.jar'
+        outfile: 'TetrisDungeon.exe'
+        errTitle: 'Tetris Dungeon'
+        downloadUrl: 'https://java.com/download'
+        minJdkVersion: '1.8.0'
+
+    - name: Build Windows Portable App (Embedded JRE) using jpackage
       shell: powershell
       run: |
-        # Put ONLY TetrisDungeon.jar into clean input dir for instant 5-second build
         New-Item -ItemType Directory -Force -Path jar_dir
         Copy-Item TetrisDungeon.jar -Destination jar_dir\
         
         jpackage --type app-image --name TetrisDungeon --input jar_dir --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris --dest dist
         
-        # Copy output TetrisDungeon.exe to root level
-        Copy-Item dist\TetrisDungeon\TetrisDungeon.exe -Destination TetrisDungeon.exe
-        
-        # Package entire Portable Windows directory (TetrisDungeon.exe + embedded runtime) into Zip
+        # Package entire Portable Windows directory into Zip
         Compress-Archive -Path dist\TetrisDungeon\* -DestinationPath TetrisDungeon-Windows-Portable.zip
 
     - name: Upload Windows Portable Artifacts
@@ -76,8 +82,8 @@ jobs:
           ## 🎮 Tetris Dungeon Release
           
           ### 📥 Download Links:
-          - **`TetrisDungeon.exe`**: Standard Windows Executable.
-          - **`TetrisDungeon-Windows-Portable.zip`**: Complete Portable Windows package (Includes embedded Java runtime, no installation required!).
+          - **`TetrisDungeon.exe`**: Single Standalone Windows Executable (Run anywhere without cfg/folders!).
+          - **`TetrisDungeon-Windows-Portable.zip`**: Complete Portable Windows package (Includes embedded Java runtime, extract zip & run!).
           - **`TetrisDungeon.jar`**: Cross-platform executable JAR file.
         files: |
           TetrisDungeon.exe
