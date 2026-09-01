@@ -40,7 +40,11 @@ jobs:
     - name: Build Windows Executable (TetrisDungeon.exe) using jpackage
       shell: powershell
       run: |
-        jpackage --type app-image --name TetrisDungeon --input . --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris --dest dist
+        # Put ONLY TetrisDungeon.jar into clean input dir for instant 5-second build
+        New-Item -ItemType Directory -Force -Path jar_dir
+        Copy-Item TetrisDungeon.jar -Destination jar_dir\
+        
+        jpackage --type app-image --name TetrisDungeon --input jar_dir --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris --dest dist
         
         # Copy output TetrisDungeon.exe to root level
         Copy-Item dist\TetrisDungeon\TetrisDungeon.exe -Destination TetrisDungeon.exe
