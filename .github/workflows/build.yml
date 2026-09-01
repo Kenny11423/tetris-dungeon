@@ -47,7 +47,7 @@ jobs:
       run: |
         choco install launch4j -y
 
-    - name: Build Single Standalone EXE (Launch4j - Self Contained 14MB)
+    - name: Build Single Standalone EXE (Launch4j - 14MB Standalone)
       shell: powershell
       run: |
         # Create Launch4j XML config
@@ -55,7 +55,7 @@ jobs:
         Add-Content -Path launch4j_config.xml -Value '  <dontWrapJar>false</dontWrapJar>'
         Add-Content -Path launch4j_config.xml -Value '  <headerType>gui</headerType>'
         Add-Content -Path launch4j_config.xml -Value '  <jar>TetrisDungeon.jar</jar>'
-        Add-Content -Path launch4j_config.xml -Value '  <outfile>TetrisDungeon.exe</outfile>'
+        Add-Content -Path launch4j_config.xml -Value '  <outfile>TetrisDungeon-Standalone.exe</outfile>'
         Add-Content -Path launch4j_config.xml -Value '  <errTitle>Tetris Dungeon</errTitle>'
         Add-Content -Path launch4j_config.xml -Value '  <cmdLine></cmdLine>'
         Add-Content -Path launch4j_config.xml -Value '  <chdir>.</chdir>'
@@ -76,6 +76,9 @@ jobs:
         
         # Run Launch4j binary installed via Chocolatey
         & "C:\Program Files (x86)\Launch4j\launch4j.exe" launch4j_config.xml
+        
+        # Copy to TetrisDungeon.exe as well
+        Copy-Item TetrisDungeon-Standalone.exe -Destination TetrisDungeon.exe
 
     - name: Build Windows Portable App (Embedded JRE) using jpackage
       shell: powershell
@@ -85,14 +88,17 @@ jobs:
         
         jpackage --type app-image --name TetrisDungeon --input jar_dir --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris --dest dist
         
-        # Package entire Portable Windows directory into Zip
-        Compress-Archive -Path dist\TetrisDungeon\* -DestinationPath TetrisDungeon-Windows-Portable.zip
+        # Compress dist/TetrisDungeon folder correctly with proper relative paths
+        Set-Location dist\TetrisDungeon
+        Get-ChildItem -Path . | Compress-Archive -DestinationPath ..\..\TetrisDungeon-Windows-Portable.zip
+        Set-Location ..\..
 
     - name: Upload Windows Portable Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: TetrisDungeon-Windows-Portable
         path: |
+          TetrisDungeon-Standalone.exe
           TetrisDungeon.exe
           TetrisDungeon-Windows-Portable.zip
           TetrisDungeon.jar
@@ -107,10 +113,12 @@ jobs:
           ## 🎮 Tetris Dungeon Release
           
           ### 📥 Download Links:
-          - **`TetrisDungeon.exe`**: Single Standalone Windows Executable (Run anywhere without cfg/folders!).
-          - **`TetrisDungeon-Windows-Portable.zip`**: Complete Portable Windows package (Includes embedded Java runtime, extract zip & run!).
+          - **`TetrisDungeon-Standalone.exe`**: 100% Single Standalone Windows Executable (14MB - Run anywhere without unzipping, folders or cfg files!).
+          - **`TetrisDungeon.exe`**: Single Standalone Windows Executable.
+          - **`TetrisDungeon-Windows-Portable.zip`**: Complete Portable Windows package with proper folder structure (Includes embedded Java runtime).
           - **`TetrisDungeon.jar`**: Cross-platform executable JAR file.
         files: |
+          TetrisDungeon-Standalone.exe
           TetrisDungeon.exe
           TetrisDungeon-Windows-Portable.zip
           TetrisDungeon.jar
