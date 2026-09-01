@@ -47,7 +47,7 @@ jobs:
       run: |
         choco install launch4j -y
 
-    - name: Build Single Standalone EXE (Launch4j)
+    - name: Build Single Standalone EXE (Launch4j - Self Contained 14MB)
       shell: powershell
       run: |
         # Create Launch4j XML config
@@ -114,6 +114,7 @@ jobs:
           TetrisDungeon.exe
           TetrisDungeon-Windows-Portable.zip
           TetrisDungeon.jar
+        overwrite: true
         draft: false
         prerelease: false
       env:
