@@ -53,7 +53,7 @@ jobs:
         $jarPath = (Get-Item TetrisDungeon.jar).FullName
         $outPath = Join-Path $pwd "TetrisDungeon-Standalone.exe"
         
-        # Create Launch4j XML config with absolute paths
+        # Create Launch4j XML config
         Set-Content -Path launch4j_config.xml -Value '<launch4jConfig>'
         Add-Content -Path launch4j_config.xml -Value '  <dontWrapJar>false</dontWrapJar>'
         Add-Content -Path launch4j_config.xml -Value '  <headerType>gui</headerType>'
@@ -70,7 +70,7 @@ jobs:
         Add-Content -Path launch4j_config.xml -Value '  <manifest></manifest>'
         Add-Content -Path launch4j_config.xml -Value '  <icon></icon>'
         Add-Content -Path launch4j_config.xml -Value '  <jre>'
-        Add-Content -Path launch4j_config.xml -Value '    <path>%JAVA_HOME%</path>'
+        Add-Content -Path launch4j_config.xml -Value '    <path></path>'
         Add-Content -Path launch4j_config.xml -Value '    <requires64Bit>false</requires64Bit>'
         Add-Content -Path launch4j_config.xml -Value '    <minVersion>1.8.0</minVersion>'
         Add-Content -Path launch4j_config.xml -Value '    <maxVersion></maxVersion>'
@@ -80,8 +80,14 @@ jobs:
         # Run Launch4j CONSOLE binary launch4jc.exe
         & "C:\Program Files (x86)\Launch4j\launch4jc.exe" launch4j_config.xml
         
-        # Copy to TetrisDungeon.exe as well
-        Copy-Item TetrisDungeon-Standalone.exe -Destination TetrisDungeon.exe
+        # Verify file creation
+        if (Test-Path TetrisDungeon-Standalone.exe) {
+            Copy-Item TetrisDungeon-Standalone.exe -Destination TetrisDungeon.exe
+            Write-Host "SUCCESS: TetrisDungeon-Standalone.exe built successfully!"
+        } else {
+            Write-Error "ERROR: Launch4j failed to build TetrisDungeon-Standalone.exe"
+            exit 1
+        }
 
     - name: Build Windows Portable App (Embedded JRE) using jpackage
       shell: powershell
@@ -91,10 +97,10 @@ jobs:
         
         jpackage --type app-image --name TetrisDungeon --input jar_dir --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris --dest dist
         
-        # Compress dist/TetrisDungeon folder correctly with proper relative paths
-        Set-Location dist\TetrisDungeon
-        Get-ChildItem -Path . | Compress-Archive -DestinationPath ..\..\TetrisDungeon-Windows-Portable.zip
-        Set-Location ..\..
+        # Package dist/TetrisDungeon folder as a single clean root directory in ZIP
+        Set-Location dist
+        Compress-Archive -Path TetrisDungeon -DestinationPath ..\TetrisDungeon-Windows-Portable.zip
+        Set-Location ..
 
     - name: Upload Windows Portable Artifacts
       uses: actions/upload-artifact@v4
