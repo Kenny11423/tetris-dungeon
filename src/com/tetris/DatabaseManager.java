@@ -1,24 +1,22 @@
 package com.tetris;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.net.http.HttpRequest.BodyPublishers;
-import java.time.Duration;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 
 public class DatabaseManager {
 
-    // IMPORTANT: Update this URL to point to your online API
-    // For local testing, keep it as localhost:3000
-    private static final String API_URL = "http://localhost:3000/api/scores";
-    
-    private static final HttpClient client = HttpClient.newBuilder()
-            .version(HttpClient.Version.HTTP_2)
-            .connectTimeout(Duration.ofSeconds(5))
-            .build();
+    // MySQL Connection configuration
+    private static final String URL = "jdbc:mysql://localhost:3306/tetris_dungeon?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+    private static final String USER = "root";
+    private static final String PASSWORD = "";
+
+    // Fallback list when MySQL server is offline during standalone execution
+    private static final List<HighScore> fallbackScores = new ArrayList<>();
 
     public static class HighScore {
         public String name;
@@ -32,60 +30,72 @@ public class DatabaseManager {
         }
     }
 
+    private static Connection getConnection() throws Exception {
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+        } catch (ClassNotFoundException e) {
+            // Fallback for older MySQL drivers if present
+            Class.forName("com.mysql.jdbc.Driver");
+        }
+        return DriverManager.getConnection(URL, USER, PASSWORD);
+    }
+
     public static void initializeDatabase() {
-        System.out.println("No longer using direct JDBC. Database initialization is now handled by the Backend API.");
+        try (Connection conn = getConnection();
+             Statement stmt = conn.createStatement()) {
+            
+            String sql = "CREATE TABLE IF NOT EXISTS high_scores (" +
+                         "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                         "name VARCHAR(50) NOT NULL, " +
+                         "score INT NOT NULL, " +
+                         "level INT NOT NULL, " +
+                         "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP" +
+                         ")";
+            stmt.execute(sql);
+            System.out.println("[JDBC-MySQL] Database and table initialized successfully.");
+        } catch (Exception e) {
+            System.out.println("[JDBC-MySQL Notice] Local MySQL server not detected (" + e.getMessage() + "). Memory fallback active.");
+        }
     }
 
     public static void saveHighScore(String name, int score, int level) {
-        try {
-            String jsonBody = String.format("{\"name\": \"%s\", \"score\": %d, \"level\": %d}", 
-                                            name.replace("\"", "\\\""), score, level);
+        String sql = "INSERT INTO high_scores (name, score, level) VALUES (?, ?, ?)";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(API_URL))
-                    .header("Content-Type", "application/json")
-                    .POST(BodyPublishers.ofString(jsonBody))
-                    .build();
-            
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                System.err.println("API Error: Failed to save score.");
-            }
+            pstmt.setString(1, name);
+            pstmt.setInt(2, score);
+            pstmt.setInt(3, level);
+            pstmt.executeUpdate();
+            System.out.println("[JDBC-MySQL] Saved score successfully for: " + name);
         } catch (Exception e) {
-            System.err.println("Error saving high score over HTTP: " + e.getMessage());
+            System.out.println("[JDBC-MySQL Notice] Saved score locally: " + name);
+            fallbackScores.add(new HighScore(name, score, level));
         }
     }
 
     public static List<HighScore> getTopScores(int limit) {
         List<HighScore> scores = new ArrayList<>();
-        try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(API_URL))
-                    .GET()
-                    .build();
+        String sql = "SELECT name, score, level FROM high_scores ORDER BY score DESC, level DESC LIMIT ?";
+        
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            pstmt.setInt(1, limit);
+            ResultSet rs = pstmt.executeQuery();
             
-            if (response.statusCode() == 200) {
-                String[] lines = response.body().split("\n");
-                for (String line : lines) {
-                    if (line.trim().isEmpty()) continue;
-                    String[] parts = line.split(",");
-                    if (parts.length == 3) {
-                        scores.add(new HighScore(
-                            parts[0], 
-                            Integer.parseInt(parts[1]), 
-                            Integer.parseInt(parts[2])
-                        ));
-                    }
-                }
-            } else {
-                System.err.println("API Error: Failed to fetch scores.");
+            while (rs.next()) {
+                scores.add(new HighScore(
+                    rs.getString("name"),
+                    rs.getInt("score"),
+                    rs.getInt("level")
+                ));
             }
         } catch (Exception e) {
-            System.err.println("Error fetching high scores over HTTP: " + e.getMessage());
-            // Add a placeholder if the server is offline
-            scores.add(new HighScore("Server Offline", 0, 0));
+            fallbackScores.sort((a, b) -> Integer.compare(b.score, a.score));
+            for (int i = 0; i < Math.min(limit, fallbackScores.size()); i++) {
+                scores.add(fallbackScores.get(i));
+            }
         }
         
         return scores;

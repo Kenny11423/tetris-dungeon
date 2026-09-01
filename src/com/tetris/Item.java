@@ -13,7 +13,8 @@ public class Item {
         GEM_HP,
         WEAPON,
         ARMOR,
-        GOLD
+        GOLD,
+        DUNGEON_KEY
     }
 
     private String name;

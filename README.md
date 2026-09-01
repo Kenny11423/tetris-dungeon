@@ -1,6 +1,6 @@
 # Tetris Dungeon
 
-Tetris Dungeon is a game that combines classic Tetris puzzle gameplay with RPG Dungeon mechanics, built entirely using Java Swing.
+Tetris Dungeon is a game that combines classic Tetris puzzle gameplay with RPG Dungeon mechanics, built with Java.
 
 ## Tech Stack
 
@@ -11,23 +11,6 @@ Tetris Dungeon is a game that combines classic Tetris puzzle gameplay with RPG D
   - `Board.java` (Panel): The core engine handling falling block logic, collision detection, line clearing, and board rendering.
   - `Shape.java`: Defines the structure and rotation matrices of the Tetrominoes.
   - `RoundedPanel.java`: A custom component that supports modern rounded-corner UI designs.
-
-## Installation & Execution
-
-1. Open a terminal and navigate to the project directory:
-   ```bash
-   cd /home/kennysk/java
-   ```
-2. Run the packaged game directly:
-   ```bash
-   java -jar TetrisDungeon.jar
-   ```
-
-*(Alternatively, to compile and run from source):*
-```bash
-javac -d bin src/com/tetris/*.java
-java -cp bin com.tetris.Tetris
-```
 
 ## Game Mechanics & Business Logic
 

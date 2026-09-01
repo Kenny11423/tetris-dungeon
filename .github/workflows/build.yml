@@ -1,4 +1,4 @@
-name: Build and Package Tetris Dungeon
+name: Build & Package Tetris Dungeon EXE & JAR
 
 on:
   push:
@@ -8,80 +8,118 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-jar:
-    name: Build JAR
-    runs-on: ubuntu-latest
-    container:
-      image: archlinux:latest
-    
-    steps:
-    - name: Install system dependencies (Arch Linux)
-      run: pacman -Syu --noconfirm git jdk17-openjdk nodejs
-
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    # Setup Java is not needed since we installed jdk17-openjdk via pacman
-    - name: Compile Java source code
-      run: |
-        mkdir -p bin
-        mkdir -p lib
-        curl -L -o lib/mariadb-java-client.jar https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.1.4/mariadb-java-client-3.1.4.jar
-        javac -encoding UTF-8 -d bin src/com/tetris/*.java
-        
-    - name: Package to JAR
-      run: |
-        cd bin
-        jar xf ../lib/mariadb-java-client.jar
-        cd ..
-        jar cfe TetrisDungeon.jar com.tetris.Tetris -C bin .
-        
-    - name: Upload JAR Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: TetrisDungeon-JAR
-        path: TetrisDungeon.jar
-
-  build-exe:
-    name: Build Windows EXE
+  build-windows-exe:
+    name: Build Windows EXE & Standalone Package
     runs-on: windows-latest
-    
+
     steps:
-    - name: Checkout code
+    - name: Checkout repository
       uses: actions/checkout@v4
-      
+
     - name: Set up JDK 17
       uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-        
-    - name: Compile Java source code
-      shell: bash
+
+    - name: Compile Java & Build Executable JAR
+      shell: powershell
       run: |
-        mkdir -p bin
-        mkdir -p lib
-        curl -L -o lib/mariadb-java-client.jar https://repo1.maven.org/maven2/org/mariadb/jdbc/mariadb-java-client/3.1.4/mariadb-java-client-3.1.4.jar
-        javac -encoding UTF-8 -d bin src/com/tetris/*.java
+        New-Item -ItemType Directory -Force -Path bin
+        javac -encoding UTF-8 -cp "lib/*" -d bin src/com/tetris/*.java
         
-    - name: Package to JAR
-      shell: bash
+        # Extract sqlite-jdbc into bin
+        Set-Location bin
+        jar xf ..\lib\sqlite-jdbc.jar
+        Set-Location ..
+        
+        # Create manifest and build self-contained JAR
+        "Main-Class: com.tetris.Tetris" | Out-File -Encoding ascii manifest.txt
+        jar cvfm TetrisDungeon.jar manifest.txt -C bin .
+
+    - name: Create Launch4j Standalone EXE
+      shell: powershell
       run: |
-        cd bin
-        jar xf ../lib/mariadb-java-client.jar
-        cd ..
-        jar cfe TetrisDungeon.jar com.tetris.Tetris -C bin .
+        # Download Launch4j tool for Windows
+        Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/launch4j/launch4j-3/3.50/launch4j-3.50-win32.zip" -OutFile "launch4j.zip"
+        Expand-Archive -Path "launch4j.zip" -DestinationPath "launch4j"
         
-    - name: Build EXE using jpackage
-      shell: bash
+        # Create Launch4j XML config
+        $xmlContent = @"
+<launch4jConfig>
+  <dontWrapJar>false</dontWrapJar>
+  <headerType>gui</headerType>
+  <jar>TetrisDungeon.jar</jar>
+  <outfile>TetrisDungeon.exe</outfile>
+  <errTitle>Tetris Dungeon</errTitle>
+  <cmdLine></cmdLine>
+  <chdir>.</chdir>
+  <priority>normal</priority>
+  <downloadUrl>https://java.com/download</downloadUrl>
+  <supportUrl></supportUrl>
+  <stayAlive>false</stayAlive>
+  <restartOnCrash>false</restartOnCrash>
+  <manifest></manifest>
+  <icon></icon>
+  <jre>
+    <path>%JAVA_HOME%</path>
+    <requires64Bit>false</requires64Bit>
+    <minVersion>1.8.0</minVersion>
+    <maxVersion></maxVersion>
+  </jre>
+</launch4jConfig>
+"@
+        $xmlContent | Out-File -Encoding utf8 launch4j_config.xml
+        
+        # Run Launch4j to generate TetrisDungeon.exe
+        .\launch4j\launch4j\launch4j.exe launch4j_config.xml
+
+    - name: Package Windows Zip (EXE + JAR + Run script)
+      shell: powershell
       run: |
-        jpackage --type app-image --name TetrisDungeon --input . --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris
+        New-Item -ItemType Directory -Force -Path ReleasePackage
+        Copy-Item TetrisDungeon.exe -Destination ReleasePackage\
+        Copy-Item TetrisDungeon.jar -Destination ReleasePackage\
         
-    - name: Zip the Windows package
-      run: Compress-Archive -Path TetrisDungeon -DestinationPath TetrisDungeon-Windows.zip
+        # Create a simple batch runner
+        "start TetrisDungeon.exe" | Out-File -Encoding ascii ReleasePackage\Run_Game.bat
         
+        Compress-Archive -Path ReleasePackage\* -DestinationPath TetrisDungeon-Windows-EXE.zip
+
     - name: Upload Windows EXE Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: TetrisDungeon-Windows
-        path: TetrisDungeon-Windows.zip
+        name: TetrisDungeon-Windows-EXE
+        path: |
+          TetrisDungeon.exe
+          TetrisDungeon-Windows-EXE.zip
+
+  build-jar:
+    name: Build Cross-Platform JAR
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Compile & Build Executable JAR
+      run: |
+        mkdir -p bin
+        javac -encoding UTF-8 -cp "lib/*" -d bin src/com/tetris/*.java
+        cd bin
+        jar xf ../lib/sqlite-jdbc.jar
+        cd ..
+        echo "Main-Class: com.tetris.Tetris" > manifest.txt
+        jar cvfm TetrisDungeon.jar manifest.txt -C bin .
+
+    - name: Upload Cross-Platform JAR Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: TetrisDungeon-JAR
+        path: TetrisDungeon.jar

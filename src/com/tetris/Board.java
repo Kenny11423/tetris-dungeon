@@ -70,6 +70,35 @@ public class Board extends JPanel {
         }
     }
 
+    public void moveLeft() {
+        if (!isStarted || isPaused || isEventPaused || curPiece == null || curPiece.getShape() == Tetrominoe.NoShape) return;
+        if (inverseControls) tryMove(curPiece, curX + 1, curY);
+        else tryMove(curPiece, curX - 1, curY);
+    }
+
+    public void moveRight() {
+        if (!isStarted || isPaused || isEventPaused || curPiece == null || curPiece.getShape() == Tetrominoe.NoShape) return;
+        if (inverseControls) tryMove(curPiece, curX - 1, curY);
+        else tryMove(curPiece, curX + 1, curY);
+    }
+
+    public void softDrop() {
+        if (!isStarted || isPaused || isEventPaused || curPiece == null || curPiece.getShape() == Tetrominoe.NoShape) return;
+        oneLineDown();
+    }
+
+    public void rotatePiece() {
+        if (!isStarted || isPaused || isEventPaused || curPiece == null || curPiece.getShape() == Tetrominoe.NoShape) return;
+        if (noRotateCount <= 0) {
+            tryRotate(curPiece.rotateRight(), curX, curY);
+        }
+    }
+
+    public void hardDrop() {
+        if (!isStarted || isPaused || isEventPaused || curPiece == null || curPiece.getShape() == Tetrominoe.NoShape) return;
+        dropDown();
+    }
+
     private int squareSize() {
         return Math.min((int) getSize().getWidth() / BOARD_WIDTH,
                         (int) getSize().getHeight() / BOARD_HEIGHT);
@@ -166,6 +195,10 @@ public class Board extends JPanel {
         repaint();
     }
 
+    public int getScore() {
+        return score;
+    }
+
     public void reset() {
     }
 
@@ -250,21 +283,29 @@ public class Board extends JPanel {
             newY--;
         }
         tryMove(curPiece, curX, newY);
+        lockStartTime = 0;
+        lockResetCount = 0;
         pieceDropped();
     }
 
-    private int lockGraceTicks = 0;
+    private long lockStartTime = 0;
+    private static final long LOCK_DELAY_MS = 500; // 500 ms official Tetris lock delay
+    private int lockResetCount = 0;
+    private static final int MAX_LOCK_RESETS = 15;
 
     private void oneLineDown() {
         if (!canMove(curPiece, curX, curY - 1)) {
-            lockGraceTicks++;
-            if (lockGraceTicks >= 2) { // Wait 1 extra tick before locking
+            long now = System.currentTimeMillis();
+            if (lockStartTime == 0) {
+                lockStartTime = now;
+            } else if (now - lockStartTime >= LOCK_DELAY_MS || lockResetCount >= MAX_LOCK_RESETS) {
                 pieceDropped();
-                lockGraceTicks = 0;
+                lockStartTime = 0;
+                lockResetCount = 0;
             }
         } else {
             tryMove(curPiece, curX, curY - 1);
-            lockGraceTicks = 0;
+            lockStartTime = 0;
         }
     }
 
@@ -278,7 +319,9 @@ public class Board extends JPanel {
         for (int i = 0; i < 4; i++) {
             int x = curX + curPiece.x(i);
             int y = curY - curPiece.y(i);
-            board[(y * BOARD_WIDTH) + x] = curPiece.getShape();
+            if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
+                board[(y * BOARD_WIDTH) + x] = curPiece.getShape();
+            }
         }
 
         removeFullLines();
@@ -287,6 +330,9 @@ public class Board extends JPanel {
             noRotateCount--;
             parent.updateDebuffStatus(noRotateCount > 0 ? "No Rotate (" + noRotateCount + ")" : "");
         }
+
+        lockStartTime = 0;
+        lockResetCount = 0;
 
         if (!isFallingFinished) {
             newPiece();
@@ -304,6 +350,8 @@ public class Board extends JPanel {
         parent.updateNextPiece(nextPiece);
         
         hasHeld = false;
+        lockStartTime = 0;
+        lockResetCount = 0;
         
         curX = BOARD_WIDTH / 2 + 1;
         curY = BOARD_HEIGHT - 1 + curPiece.minY();
@@ -341,19 +389,30 @@ public class Board extends JPanel {
         curX = newX;
         curY = newY;
         
-        lockGraceTicks = 0; // Reset grace period on successful move/rotate
+        // Lock Delay refresh: if piece lands on ground, reset/refresh lock delay timer up to MAX_LOCK_RESETS
+        if (!canMove(curPiece, curX, curY - 1)) {
+            if (lockResetCount < MAX_LOCK_RESETS) {
+                lockStartTime = System.currentTimeMillis();
+                lockResetCount++;
+            }
+        } else {
+            lockStartTime = 0;
+        }
         
         repaint();
-
         return true;
     }
 
     private void removeFullLines() {
         int numFullLines = 0;
+        int newRow = 0;
+        Tetrominoe[] newBoard = new Tetrominoe[BOARD_WIDTH * BOARD_HEIGHT];
+        for (int i = 0; i < BOARD_WIDTH * BOARD_HEIGHT; i++) {
+            newBoard[i] = Tetrominoe.NoShape;
+        }
 
-        for (int i = BOARD_HEIGHT - 1; i >= 0; i--) {
+        for (int i = 0; i < BOARD_HEIGHT; i++) {
             boolean lineIsFull = true;
-
             for (int j = 0; j < BOARD_WIDTH; j++) {
                 if (shapeAt(j, i) == Tetrominoe.NoShape) {
                     lineIsFull = false;
@@ -363,15 +422,16 @@ public class Board extends JPanel {
 
             if (lineIsFull) {
                 numFullLines++;
-                for (int k = i; k < BOARD_HEIGHT - 1; k++) {
-                    for (int j = 0; j < BOARD_WIDTH; j++) {
-                        board[(k * BOARD_WIDTH) + j] = shapeAt(j, k + 1);
-                    }
+            } else {
+                for (int j = 0; j < BOARD_WIDTH; j++) {
+                    newBoard[(newRow * BOARD_WIDTH) + j] = shapeAt(j, i);
                 }
+                newRow++;
             }
         }
 
         if (numFullLines > 0) {
+            board = newBoard;
             score += numFullLines * 100;
             parent.updateScoreAndDamageBoss(score, numFullLines);
             isFallingFinished = true;
@@ -490,7 +550,8 @@ public class Board extends JPanel {
         }
         parent.updateHoldPiece(holdPiece);
         hasHeld = true;
-        lockGraceTicks = 0;
+        lockStartTime = 0;
+        lockResetCount = 0;
         repaint();
     }
 
@@ -516,6 +577,11 @@ public class Board extends JPanel {
 
             int keycode = e.getKeyCode();
 
+            if (keycode == KeyEvent.VK_F12 || (e.isControlDown() && e.isShiftDown() && keycode == KeyEvent.VK_C)) {
+                parent.showMasterControlPanel();
+                return;
+            }
+
             if (keycode == KeyEvent.VK_P) {
                 togglePause();
                 return;
@@ -527,37 +593,53 @@ public class Board extends JPanel {
 
             switch (keycode) {
                 case KeyEvent.VK_LEFT:
+                case KeyEvent.VK_A:
+                case KeyEvent.VK_NUMPAD4:
                     if (inverseControls) tryMove(curPiece, curX + 1, curY);
                     else tryMove(curPiece, curX - 1, curY);
                     break;
                 case KeyEvent.VK_RIGHT:
+                case KeyEvent.VK_D:
+                case KeyEvent.VK_NUMPAD6:
                     if (inverseControls) tryMove(curPiece, curX - 1, curY);
                     else tryMove(curPiece, curX + 1, curY);
                     break;
                 case KeyEvent.VK_DOWN:
+                case KeyEvent.VK_S:
+                case KeyEvent.VK_NUMPAD2:
                     oneLineDown();
                     break;
                 case KeyEvent.VK_UP:
+                case KeyEvent.VK_W:
+                case KeyEvent.VK_J:
+                case KeyEvent.VK_NUMPAD8:
                     if (noRotateCount <= 0) {
                         tryRotate(curPiece.rotateRight(), curX, curY);
                     }
                     break;
                 case KeyEvent.VK_SPACE:
+                case KeyEvent.VK_ENTER:
+                case KeyEvent.VK_K:
                     dropDown();
                     break;
-                case KeyEvent.VK_D:
-                    oneLineDown();
-                    break;
-                case KeyEvent.VK_C:
+                case KeyEvent.VK_V:
+                case KeyEvent.VK_L:
+                case KeyEvent.VK_SHIFT:
                     holdPieceAction();
                     break;
+                case KeyEvent.VK_Z:
                 case KeyEvent.VK_1:
+                case KeyEvent.VK_U:
                     parent.useItem(0);
                     break;
+                case KeyEvent.VK_X:
                 case KeyEvent.VK_2:
+                case KeyEvent.VK_I:
                     parent.useItem(1);
                     break;
+                case KeyEvent.VK_C:
                 case KeyEvent.VK_3:
+                case KeyEvent.VK_O:
                     parent.useItem(2);
                     break;
             }
