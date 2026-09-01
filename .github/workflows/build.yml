@@ -37,59 +37,24 @@ jobs:
         "Main-Class: com.tetris.Tetris" | Out-File -Encoding ascii manifest.txt
         jar cvfm TetrisDungeon.jar manifest.txt -C bin .
 
-    - name: Create Launch4j Standalone EXE
+    - name: Build Windows Executable (TetrisDungeon.exe) using jpackage
       shell: powershell
       run: |
-        # Download Launch4j tool for Windows
-        Invoke-WebRequest -Uri "https://downloads.sourceforge.net/project/launch4j/launch4j-3/3.50/launch4j-3.50-win32.zip" -OutFile "launch4j.zip"
-        Expand-Archive -Path "launch4j.zip" -DestinationPath "launch4j"
+        jpackage --type app-image --name TetrisDungeon --input . --main-jar TetrisDungeon.jar --main-class com.tetris.Tetris --dest dist
         
-        # Create Launch4j XML config
-        Set-Content -Path launch4j_config.xml -Value '<launch4jConfig>'
-        Add-Content -Path launch4j_config.xml -Value '  <dontWrapJar>false</dontWrapJar>'
-        Add-Content -Path launch4j_config.xml -Value '  <headerType>gui</headerType>'
-        Add-Content -Path launch4j_config.xml -Value '  <jar>TetrisDungeon.jar</jar>'
-        Add-Content -Path launch4j_config.xml -Value '  <outfile>TetrisDungeon.exe</outfile>'
-        Add-Content -Path launch4j_config.xml -Value '  <errTitle>Tetris Dungeon</errTitle>'
-        Add-Content -Path launch4j_config.xml -Value '  <cmdLine></cmdLine>'
-        Add-Content -Path launch4j_config.xml -Value '  <chdir>.</chdir>'
-        Add-Content -Path launch4j_config.xml -Value '  <priority>normal</priority>'
-        Add-Content -Path launch4j_config.xml -Value '  <downloadUrl>https://java.com/download</downloadUrl>'
-        Add-Content -Path launch4j_config.xml -Value '  <supportUrl></supportUrl>'
-        Add-Content -Path launch4j_config.xml -Value '  <stayAlive>false</stayAlive>'
-        Add-Content -Path launch4j_config.xml -Value '  <restartOnCrash>false</restartOnCrash>'
-        Add-Content -Path launch4j_config.xml -Value '  <manifest></manifest>'
-        Add-Content -Path launch4j_config.xml -Value '  <icon></icon>'
-        Add-Content -Path launch4j_config.xml -Value '  <jre>'
-        Add-Content -Path launch4j_config.xml -Value '    <path>%JAVA_HOME%</path>'
-        Add-Content -Path launch4j_config.xml -Value '    <requires64Bit>false</requires64Bit>'
-        Add-Content -Path launch4j_config.xml -Value '    <minVersion>1.8.0</minVersion>'
-        Add-Content -Path launch4j_config.xml -Value '    <maxVersion></maxVersion>'
-        Add-Content -Path launch4j_config.xml -Value '  </jre>'
-        Add-Content -Path launch4j_config.xml -Value '</launch4jConfig>'
+        # Copy output TetrisDungeon.exe to root level
+        Copy-Item dist\TetrisDungeon\TetrisDungeon.exe -Destination TetrisDungeon.exe
         
-        # Run Launch4j to generate TetrisDungeon.exe
-        .\launch4j\launch4j\launch4j.exe launch4j_config.xml
+        # Package entire Portable Windows directory (TetrisDungeon.exe + embedded runtime) into Zip
+        Compress-Archive -Path dist\TetrisDungeon -DestinationPath TetrisDungeon-Windows-Portable.zip
 
-    - name: Package Windows Zip (EXE + JAR + Run script)
-      shell: powershell
-      run: |
-        New-Item -ItemType Directory -Force -Path ReleasePackage
-        Copy-Item TetrisDungeon.exe -Destination ReleasePackage\
-        Copy-Item TetrisDungeon.jar -Destination ReleasePackage\
-        
-        # Create a simple batch runner
-        "start TetrisDungeon.exe" | Out-File -Encoding ascii ReleasePackage\Run_Game.bat
-        
-        Compress-Archive -Path ReleasePackage\* -DestinationPath TetrisDungeon-Windows-EXE.zip
-
-    - name: Upload Windows EXE Artifact
+    - name: Upload Windows Portable EXE Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: TetrisDungeon-Windows-EXE
+        name: TetrisDungeon-Windows-Portable
         path: |
           TetrisDungeon.exe
-          TetrisDungeon-Windows-EXE.zip
+          TetrisDungeon-Windows-Portable.zip
 
   build-jar:
     name: Build Cross-Platform JAR
