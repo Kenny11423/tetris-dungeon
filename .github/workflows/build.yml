@@ -52,8 +52,9 @@ jobs:
       run: |
         $jarPath = (Get-Item TetrisDungeon.jar).FullName
         $outPath = Join-Path $pwd "TetrisDungeon-Standalone.exe"
+        $javaHome = $env:JAVA_HOME
         
-        # Create Launch4j XML config
+        # Create Launch4j XML config with expanded JAVA_HOME path
         Set-Content -Path launch4j_config.xml -Value '<launch4jConfig>'
         Add-Content -Path launch4j_config.xml -Value '  <dontWrapJar>false</dontWrapJar>'
         Add-Content -Path launch4j_config.xml -Value '  <headerType>gui</headerType>'
@@ -70,10 +71,11 @@ jobs:
         Add-Content -Path launch4j_config.xml -Value '  <manifest></manifest>'
         Add-Content -Path launch4j_config.xml -Value '  <icon></icon>'
         Add-Content -Path launch4j_config.xml -Value '  <jre>'
-        Add-Content -Path launch4j_config.xml -Value '    <path></path>'
+        Add-Content -Path launch4j_config.xml -Value "    <path>$javaHome</path>"
         Add-Content -Path launch4j_config.xml -Value '    <requires64Bit>false</requires64Bit>'
         Add-Content -Path launch4j_config.xml -Value '    <minVersion>1.8.0</minVersion>'
         Add-Content -Path launch4j_config.xml -Value '    <maxVersion></maxVersion>'
+        Add-Content -Path launch4j_config.xml -Value '    <jdkPreference>preferJdk</jdkPreference>'
         Add-Content -Path launch4j_config.xml -Value '  </jre>'
         Add-Content -Path launch4j_config.xml -Value '</launch4jConfig>'
         
