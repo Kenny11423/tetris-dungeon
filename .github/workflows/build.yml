@@ -45,31 +45,28 @@ jobs:
         Expand-Archive -Path "launch4j.zip" -DestinationPath "launch4j"
         
         # Create Launch4j XML config
-        $xmlContent = @"
-<launch4jConfig>
-  <dontWrapJar>false</dontWrapJar>
-  <headerType>gui</headerType>
-  <jar>TetrisDungeon.jar</jar>
-  <outfile>TetrisDungeon.exe</outfile>
-  <errTitle>Tetris Dungeon</errTitle>
-  <cmdLine></cmdLine>
-  <chdir>.</chdir>
-  <priority>normal</priority>
-  <downloadUrl>https://java.com/download</downloadUrl>
-  <supportUrl></supportUrl>
-  <stayAlive>false</stayAlive>
-  <restartOnCrash>false</restartOnCrash>
-  <manifest></manifest>
-  <icon></icon>
-  <jre>
-    <path>%JAVA_HOME%</path>
-    <requires64Bit>false</requires64Bit>
-    <minVersion>1.8.0</minVersion>
-    <maxVersion></maxVersion>
-  </jre>
-</launch4jConfig>
-"@
-        $xmlContent | Out-File -Encoding utf8 launch4j_config.xml
+        Set-Content -Path launch4j_config.xml -Value '<launch4jConfig>'
+        Add-Content -Path launch4j_config.xml -Value '  <dontWrapJar>false</dontWrapJar>'
+        Add-Content -Path launch4j_config.xml -Value '  <headerType>gui</headerType>'
+        Add-Content -Path launch4j_config.xml -Value '  <jar>TetrisDungeon.jar</jar>'
+        Add-Content -Path launch4j_config.xml -Value '  <outfile>TetrisDungeon.exe</outfile>'
+        Add-Content -Path launch4j_config.xml -Value '  <errTitle>Tetris Dungeon</errTitle>'
+        Add-Content -Path launch4j_config.xml -Value '  <cmdLine></cmdLine>'
+        Add-Content -Path launch4j_config.xml -Value '  <chdir>.</chdir>'
+        Add-Content -Path launch4j_config.xml -Value '  <priority>normal</priority>'
+        Add-Content -Path launch4j_config.xml -Value '  <downloadUrl>https://java.com/download</downloadUrl>'
+        Add-Content -Path launch4j_config.xml -Value '  <supportUrl></supportUrl>'
+        Add-Content -Path launch4j_config.xml -Value '  <stayAlive>false</stayAlive>'
+        Add-Content -Path launch4j_config.xml -Value '  <restartOnCrash>false</restartOnCrash>'
+        Add-Content -Path launch4j_config.xml -Value '  <manifest></manifest>'
+        Add-Content -Path launch4j_config.xml -Value '  <icon></icon>'
+        Add-Content -Path launch4j_config.xml -Value '  <jre>'
+        Add-Content -Path launch4j_config.xml -Value '    <path>%JAVA_HOME%</path>'
+        Add-Content -Path launch4j_config.xml -Value '    <requires64Bit>false</requires64Bit>'
+        Add-Content -Path launch4j_config.xml -Value '    <minVersion>1.8.0</minVersion>'
+        Add-Content -Path launch4j_config.xml -Value '    <maxVersion></maxVersion>'
+        Add-Content -Path launch4j_config.xml -Value '  </jre>'
+        Add-Content -Path launch4j_config.xml -Value '</launch4jConfig>'
         
         # Run Launch4j to generate TetrisDungeon.exe
         .\launch4j\launch4j\launch4j.exe launch4j_config.xml
