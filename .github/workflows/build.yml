@@ -3,13 +3,18 @@ name: Build & Package Tetris Dungeon EXE & JAR
 on:
   push:
     branches: [ "main", "master" ]
+    tags:
+      - "v*"
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  build-windows-exe:
-    name: Build Windows EXE & Standalone Package
+  build-and-release:
+    name: Build & Publish GitHub Release
     runs-on: windows-latest
 
     steps:
@@ -50,42 +55,35 @@ jobs:
         Copy-Item dist\TetrisDungeon\TetrisDungeon.exe -Destination TetrisDungeon.exe
         
         # Package entire Portable Windows directory (TetrisDungeon.exe + embedded runtime) into Zip
-        Compress-Archive -Path dist\TetrisDungeon -DestinationPath TetrisDungeon-Windows-Portable.zip
+        Compress-Archive -Path dist\TetrisDungeon\* -DestinationPath TetrisDungeon-Windows-Portable.zip
 
-    - name: Upload Windows Portable EXE Artifact
+    - name: Upload Windows Portable Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: TetrisDungeon-Windows-Portable
         path: |
           TetrisDungeon.exe
           TetrisDungeon-Windows-Portable.zip
+          TetrisDungeon.jar
 
-  build-jar:
-    name: Build Cross-Platform JAR
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up JDK 17
-      uses: actions/setup-java@v4
+    - name: Create or Update GitHub Release
+      uses: softprops/action-gh-release@v2
+      if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
       with:
-        java-version: '17'
-        distribution: 'temurin'
-
-    - name: Compile & Build Executable JAR
-      run: |
-        mkdir -p bin
-        javac -encoding UTF-8 -cp "lib/*" -d bin src/com/tetris/*.java
-        cd bin
-        jar xf ../lib/sqlite-jdbc.jar
-        cd ..
-        echo "Main-Class: com.tetris.Tetris" > manifest.txt
-        jar cvfm TetrisDungeon.jar manifest.txt -C bin .
-
-    - name: Upload Cross-Platform JAR Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: TetrisDungeon-JAR
-        path: TetrisDungeon.jar
+        tag_name: latest
+        name: "Tetris Dungeon Latest Release 🎮"
+        body: |
+          ## 🎮 Tetris Dungeon Release
+          
+          ### 📥 Download Links:
+          - **`TetrisDungeon.exe`**: Standard Windows Executable.
+          - **`TetrisDungeon-Windows-Portable.zip`**: Complete Portable Windows package (Includes embedded Java runtime, no installation required!).
+          - **`TetrisDungeon.jar`**: Cross-platform executable JAR file.
+        files: |
+          TetrisDungeon.exe
+          TetrisDungeon-Windows-Portable.zip
+          TetrisDungeon.jar
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
